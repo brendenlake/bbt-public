@@ -24,7 +24,7 @@ python eval.py --fn_out_model net_ngame_30M_bbt_top.pt --episode_type number_gam
 
 This loads `out_models/net_ngame_30M_bbt_top.pt` and scores the human test responses. The expected reference result appears in the evaluation section below.
 
-Logical-concept Bayesian analysis and plotting also require **LOTlib3**, which is not bundled here. Make an installation providing the `LOTlib3` Python package available on your environment's import path. Both `bayes_boolean_concepts.py` and `bayes_fol_concepts.py` contain an author-specific search path (`/Users/Brenden/Libraries`); it is not a portable dependency installation. Core neural evaluation and training on the existing episode files do not import those Bayesian modules, but `make_fig4B.py`, logical-concept PCA analysis, and `generate_datasets.py` do.
+Logical-concept Bayesian analysis, plotting, and dataset generation also require **LOTlib3**, which is not bundled here. Follow the [LOTlib setup instructions](#lotlib-dependency) below. Core neural evaluation and training on the existing episode files, as well as number-game dataset generation, work without LOTlib3. Logical-concept plotting (`make_fig4B.py`) and PCA analysis require it.
 
 To inspect the available command-line arguments:
 
@@ -218,4 +218,21 @@ python -u train.py --grad_clip 1.0 --lr 0.0001 --no_lr_schedule --episode_type s
 3. **Distill, then tune.** Adapt the training commands above to your episode types: first train on synthetic data, then use `--fn_in_model` to fine-tune that checkpoint on human responses with the same architecture. Select settings on validation data and evaluate the final model on held-out human responses using `eval.py --ll`. For tokenized input/output tasks, the existing `BBT` network can generally be reused.
 
 ## LOTlib dependency
-- **Missing `LOTlib3`:** Configure the dependency in the active Python environment before running logical-concept Bayesian analyses, PCA, or dataset generation. Installing the core packages above does not supply LOTlib3.
+
+Install [LOTlib3](https://github.com/piantado/LOTlib3) separately from Steven Piantadosi for logical-concept Bayesian analyses, plotting, PCA, or dataset generation. Installing `requirements.txt` does not supply it.
+
+Clone the library (skip this step if you already have a checkout):
+
+```bash
+mkdir -p "$HOME/Libraries"
+git clone https://github.com/piantado/LOTlib3.git "$HOME/Libraries/LOTlib3"
+```
+
+Add the **parent directory** of `LOTlib3` to Python's import path in the terminal where you run the analyses:
+
+```bash
+export PYTHONPATH="$HOME/Libraries${PYTHONPATH:+:$PYTHONPATH}"
+python -c "from LOTlib3.Grammar import Grammar; import bayes_fol_concepts; print('LOTlib3 is ready')"
+```
+
+Run the check from this repository's root using the same Python environment as your analyses. If you cloned LOTlib3 elsewhere, replace `$HOME/Libraries` with its parent directory. To keep the setting across terminal sessions, add the `export` line to your shell configuration (for example, `~/.zshrc` or `~/.bashrc`). The Bayesian modules report these setup requirements if LOTlib3 is missing; they do not modify Python's import path.

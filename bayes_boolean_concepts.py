@@ -1,11 +1,19 @@
-import sys
-sys.path.insert(0,'/Users/Brenden/Libraries')
 import numpy as np
 import random
-from LOTlib3.Grammar import Grammar
-from LOTlib3.Hypotheses.LOTHypothesis import LOTHypothesis
-from LOTlib3.Hypotheses.Likelihoods.BinaryLikelihood import BinaryLikelihood
-from LOTlib3.DataAndObjects import Obj # for nicely managing data
+try:
+    from LOTlib3.Grammar import Grammar
+    from LOTlib3.Hypotheses.LOTHypothesis import LOTHypothesis
+    from LOTlib3.Hypotheses.Likelihoods.BinaryLikelihood import BinaryLikelihood
+    from LOTlib3.DataAndObjects import Obj # for nicely managing data
+except ModuleNotFoundError as exc:
+    if exc.name != 'LOTlib3':
+        raise
+    raise ModuleNotFoundError(
+        'Logical-concept Bayesian workflows require LOTlib3. Clone '
+        'https://github.com/piantado/LOTlib3 and add its parent directory '
+        'to PYTHONPATH. See "LOTlib dependency" in README.md.',
+        name='LOTlib3',
+    ) from exc
 
 ## Boolean concept learning with sets of examples, from Piantadosi et al. Psych Review paper
 

@@ -8,7 +8,6 @@ import math
 from scipy.special import logsumexp
 from train_utils import seed_all
 import bayes_num_game
-import bayes_fol_concepts
 import torch
 import numpy as np
 

@@ -1,15 +1,23 @@
 import os
-import sys
 from scipy.special import logsumexp
-sys.path.insert(0,'/Users/Brenden/Libraries')
 import numpy as np
 import random
 import pickle
-from LOTlib3.Grammar import Grammar
-from LOTlib3.Hypotheses.LOTHypothesis import LOTHypothesis
-from LOTlib3.Hypotheses.FunctionHypothesis import FunctionHypothesis
-from LOTlib3.Hypotheses.Likelihoods.BinaryLikelihood import BinaryLikelihood
-from LOTlib3.Eval import primitive
+try:
+    from LOTlib3.Grammar import Grammar
+    from LOTlib3.Hypotheses.LOTHypothesis import LOTHypothesis
+    from LOTlib3.Hypotheses.FunctionHypothesis import FunctionHypothesis
+    from LOTlib3.Hypotheses.Likelihoods.BinaryLikelihood import BinaryLikelihood
+    from LOTlib3.Eval import primitive
+except ModuleNotFoundError as exc:
+    if exc.name != 'LOTlib3':
+        raise
+    raise ModuleNotFoundError(
+        'Logical-concept Bayesian workflows require LOTlib3. Clone '
+        'https://github.com/piantado/LOTlib3 and add its parent directory '
+        'to PYTHONPATH. See "LOTlib dependency" in README.md.',
+        name='LOTlib3',
+    ) from exc
 from bayes_boolean_concepts import get_format_x, x_to_fdata, fdata_to_x_long, fdata_to_x_short, sample_set_objects
 from copy import deepcopy
 
@@ -419,24 +427,11 @@ def bayesian_predictions(list_xq, list_xs, list_ys, list_hypotheses, log_prior, 
     return list_yq_pp, (list_hypotheses[widx], log_post[widx].item()) 
 
 if __name__ == '__main__':
-    # grammar = set_grammar_weights_to_uniform(grammar) # uniform the grammar weights
-    # print(grammar)
-    # h = generate_hypothesis()
-    # print(h)
-    # xs = sample_set_objects()
-    # print(xs)
-    # ys = eval_hyp(xs,h)
-    # print(ys)
-
-    list_xs = [sample_set_objects(), sample_set_objects(), sample_set_objects()]
-    list_ys = [eval_hyp(xs,lambda S: lambda x: True) for xs in list_xs]
-    list_xq = [sample_set_objects(), sample_set_objects()]
-    list_hypotheses, log_prior = cache_LOT_hypotheses(model_type='temperature')
-    print(list_hypotheses[:10])
-    print(len(list_hypotheses))
-    yq_pp, best_hyp = bayesian_predictions(list_xq, list_xs, list_ys, list_hypotheses, log_prior, ll_type='soft')
-    # print(list_xs)
-    # print(list_ys)
-    # print(list_xq)
-    print(f'posterior predictive: {yq_pp}')
-    print(f'best hypothesis: {best_hyp}')
+    grammar = set_grammar_weights_to_uniform(grammar) # uniform the grammar weights
+    print(grammar)
+    h = generate_hypothesis()
+    print(h)
+    xs = sample_set_objects()
+    print(xs)
+    ys = eval_hyp(xs,h)
+    print(ys)
