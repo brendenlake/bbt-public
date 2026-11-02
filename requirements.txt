@@ -1,0 +1,8 @@
+# Core dependencies for training and evaluation on the included datasets.
+# LOTlib3 is required separately for logical-concept Bayesian analyses and generation.
+torch
+numpy
+scipy
+matplotlib
+scikit-learn
+pandas

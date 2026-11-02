@@ -1,0 +1,15 @@
+data
+out_models*
+*sublime-*
+__*
+temp.py
+figs_*
+out*.txt
+ModelData-*
+ModelInternal-*
+*.pdf
+*.pkl
+archive*
+CLAUDE.md
+test_*
+*.png
