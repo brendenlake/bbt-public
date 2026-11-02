@@ -13,7 +13,7 @@ from copy import deepcopy
 from model import BBT, describe_model
 import datasets as dat
 from train_utils import seed_all, extract, assert_consist_langs, display_input_output, get_best_device
-from eval_utils import mean_masked_dim1, sum_masked_dim1, display_sys_gen_html_unmap, display_sys_gen_console_unmap
+from eval_utils import mean_masked_dim1, display_sys_gen_html_unmap, display_sys_gen_console_unmap
 import matplotlib.pyplot as plt
 from sklearn import decomposition, manifold
 import pandas as pd
@@ -316,31 +316,6 @@ def replace_EOS_w_PAD(x,mylang):
     # x_length = torch.sum(x != mylang.PAD_idx, dim=1).tolist()
     return x
 
-def evaluate_ll_oracle(val_dataloader, p_lapse=0.0):
-    import bayes_num_game as oracle
-    total_N = 0
-    total_ll = 0
-    H_all,log_prior_all,h_names = oracle.generate_hypotheses(oracle.mylambda_default)
-    for batch_idx, val_batch in enumerate(val_dataloader):
-        m = val_batch['batch_size']
-        samples = val_batch['list_samples']
-        for sidx in range(m):            
-            xs = samples[sidx]['xs']
-            xs = [int(x[0]) for x in xs]                       
-            xq = samples[sidx]['xq']
-            xq = [int(x[0]) for x in xq]
-            yq = samples[sidx]['yq']
-            yq = [y[0] for y in yq]
-            pp = oracle.bayesian_predictions(xq, xs, H_all, log_prior_all)
-            assert(all([y == 'yes' or y == 'no' for y in yq]))
-            pp = [p if yq[i]=='yes' else 1-p for i,p in enumerate(pp)]
-            pp = np.array(pp)            
-            pp = np.log((1-p_lapse)*pp + p_lapse*0.5) # lapse model
-            total_ll += np.sum(pp)
-            total_N += len(pp)
-    return total_ll, total_N
-
-
 def smooth_decoder_outputs(logits_flat,p_lapse,lapse_symb_include,langs):
     # Mix decoder outputs (logits_flat) with uniform distribution over allowed emissions (in lapse_symb_include)
     #
@@ -590,32 +565,6 @@ def display_p_yes(samples_pred, fs=20):
         plt.savefig('fig_X='+str(xs)+'.png')
     # plt.show()
 
-def display_compare_models(list_samples_pred,list_labels):
-     # Make bar graph of BBT predictions vs. Bayesian model
-    #
-    # Input
-    #  list_samples_pred : each is a list of list of dicts from evaluate_acc, which has predicted query outputs for each episode
-    import bayes_num_game as oracle
-    for idx,sample in enumerate(samples_pred):
-        H_all,log_prior_all = oracle.generate_hypotheses(oracle.mylambda_default)
-        x_eval = np.array([int(x[0]) for x in sample['xq']])
-        xs = [int(x[0]) for x in sample['xs']]
-        mypred_bayes = oracle.bayesian_predictions(x_eval, xs, H_all, log_prior_all)
-    
-        fig, (ax1, ax2) = plt.subplots(2)
-        fig.set_figwidth(10)
-        fig.set_figheight(6.5)
-        oracle.subplot_predictions(ax1,x_eval,mypred_bayes)
-        ax1.set_title('Bayesian inference, X='+str(xs))
-        ax1.set_ylabel('prob. of membership')
-
-        mypred_bbt = sample['p_yes'][:,0] # we only care about first symbol
-        oracle.subplot_predictions(ax2,x_eval,mypred_bbt)
-        ax2.set_title('neural net inference, X='+str(xs))
-        ax2.set_ylabel('prob. of membership')
-        # plt.savefig('fig_X='+str(xs)+'.png')
-    plt.show()
-
 def write_set_acc_to_text(samples_pred):
     list_series = []
     for S in samples_pred: # for each episode (here, a set)
@@ -716,22 +665,6 @@ def categorize_set_hyp(list_hyp_label):
     assert np.all(row_sums <= 1), f"Each hypothesis must belong to one or fewer categories. Violating rows are: {np.where(row_sums > 1)[0]}"            
 
     return sets, sel_matrix
-
-def plot_pie_set_concepts(list_hyp_label):
-    sets, sel_matrix = categorize_set_hyp(list_hyp_label)
-    overlap = np.sum(sel_matrix, axis=1)
-    if np.any(overlap > 1):
-        print("Non-mutually exclusive hypotheses found at indices:", np.where(overlap > 1)[0])
-        for idx in np.where(overlap > 1)[0]:
-            overlapping_sets = [sets[i]['label'] for i, sel in enumerate(sel_matrix[idx]) if sel]
-            print(f"Index {idx}: {overlapping_sets} -- {list_hyp_label[idx]}")
-    counts_by_set = np.sum(sel_matrix, axis=0)
-    labels = [s['label'] for s in sets]
-    colors = [s['color'] for s in sets]
-    plt.figure(figsize=(6, 6))
-    plt.pie(counts_by_set, labels=labels, colors=colors, autopct='%1.1f%%', startangle=140)
-    plt.title('Distribution of Hypothesis Types')
-    plt.axis('equal')
 
 def plot_hidden_embeddings_set_concepts(X,list_hyp_label,list_stat,type='PCA',alpha=0.5,min_std=0.05):
     # Input
@@ -1308,13 +1241,11 @@ if __name__ == "__main__":
                     #     if m: s = m.group(1)
                     #     ax.annotate(s, (X_special[i, 0], X_special[i, 1]+offset), bbox=dict(facecolor='white'))
                     plt.savefig(fig_name)
-                # plot_pie_set_concepts(list_label_infer_hyp)
                 # plt.savefig(f"{fig_dir}/fig_{model_tag}_pie_infer.pdf")
                 ## original labels
                 # fig_name2 = f"{fig_dir}/fig_embeddings_{model_tag}_{name}_{emb_type}_original.pdf"
                 # plot_hidden_embeddings_set_concepts(dict_hooked[name],list_label_hyp,list_prob_yes_flat,type=emb_type)
                 # plt.savefig(fig_name2)
-                # plot_pie_set_concepts(list_label_hyp)
                 # plt.savefig(f"{fig_dir}/fig_{model_tag}_pie_original.pdf")
         if do_get_internal_num_game:
             import ast

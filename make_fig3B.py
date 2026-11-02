@@ -1,7 +1,4 @@
 import torch
-import torch.nn.functional as F
-from torch.utils.data import DataLoader
-from torch.distributions.categorical import Categorical
 import os
 import sys
 import argparse
@@ -10,7 +7,7 @@ import math
 from copy import deepcopy
 from model import BBT, describe_model
 import datasets as dat
-from train_utils import seed_all, extract, assert_consist_langs, display_input_output, get_best_device
+from train_utils import seed_all, extract, display_input_output, get_best_device
 import matplotlib.pyplot as plt
 import glob
 import bayes_num_game as oracle

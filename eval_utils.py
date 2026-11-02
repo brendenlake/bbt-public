@@ -98,21 +98,6 @@ def mean_masked_dim1(x,mask):
     y = y / mask_sum
     return y
 
-def sum_masked_dim1(x,mask):
-    # Compute the sum of non-masked tokens in the seq_len dimension (dim = 1)
-    # Input
-    # x : [batch_size,seq_len,d_model] tensor
-    # mask : [batch_size,seq_len], such that True means a token is missing
-    # Output
-    # y : [batch_size,d_model] (mean of non-masked tokens, over seq_len dimension)
-    if not mask.dtype == torch.bool:
-        raise ValueError("mask must be a boolean tensor")
-    mask = mask.unsqueeze(-1)
-    mask = mask.expand_as(x) # [batch_size,seq_len,d_model]
-    x = x.masked_fill(mask,0.0)
-    y = x.sum(dim=1) # [batch_size,d_model]
-    return y
-
 if __name__ == '__main__':
     # Test mean_masked
     x = torch.ones([2,3,4],dtype=torch.float32)

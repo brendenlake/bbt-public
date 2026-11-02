@@ -3,7 +3,6 @@ import numpy as np
 import torch
 import time
 import math
-from copy import deepcopy, copy
 
 def get_best_device():
     # prefer CUDA, fall back to Apple MPS if available, otherwise CPU

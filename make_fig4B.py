@@ -1,16 +1,13 @@
 import math
 import os
 import torch
-import torch.nn.functional as F
-from torch.utils.data import DataLoader
-from torch.distributions.categorical import Categorical
 import numpy as np
 from bayes_fol_concepts import eval_hyp, split_set_by_obj_sep, x_to_fdata, fdata_to_x_long, fdata_to_x_short, get_format_x, bayesian_predictions, cache_LOT_hypotheses
 from model import BBT
 from copy import deepcopy
 import datasets as dat
 from sparse_pp_approx import flat, fit_sparse_pp_approx_set_concepts
-from train_utils import seed_all, extract, assert_consist_langs, display_input_output, get_best_device
+from train_utils import seed_all, extract, display_input_output, get_best_device
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.patches import FancyBboxPatch, Circle, RegularPolygon

@@ -1,11 +1,9 @@
 import torch
-import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 import os
 import glob
 import random
 import numpy as np
-import pickle
 from copy import deepcopy, copy
 from sklearn import utils
 from train_utils import seed_all, display_input_output, get_best_device
@@ -559,101 +557,6 @@ def set_concept_otoken_to_ctoken(otoken):
         ctokens.append(merged)
     return ' '.join(ctokens)
 
-def set_concept_ctoken_to_otoken(ctoken):
-    # Example
-    #  Input: rectangle_blue_size3 rectangle_green_size1 rectangle_blue_size2 triangle_green_size1
-    #  Output: rectangle blue size_3 OBJ_SEP rectangle green size_1 OBJ_SEP rectangle blue size_2 OBJ_SEP triangle green size_1
-    objects = ctoken.strip().split()  # e.g. ['rectangle_blue_size3', ...]
-    otokens = []
-    for obj in objects:
-        parts = obj.split('_')  # e.g. ['rectangle', 'blue', 'size3']
-        parts = [p.replace('size', 'size_') for p in parts]  # 'size3' -> 'size_3'
-        otokens.append(' '.join(parts))
-    return ' OBJ_SEP '.join(otokens)
-
-class DataSetConcepts(Dataset):
-    # Meta-training for the Piantadosi's set concepts (synthetic data from Bayesian model).
-    #
-    # for training, sample number of support examples uniformly min_ns to max_ns
-    # for validation, use all of the support examples up to max_ns
-    def __init__(self, mode, mydir='data/set_concepts', inc_support_in_query=True, do_subsample_support=False, do_set_perm=False):        
-        # Input
-        #  mode: specific directory with episodes (['train','val','human_all_piantadosi_train','human_all_piantadosi_val',..])
-        #  mydir : parent directory where data is stored
-        #  inc_support_in_query : (True/false), provide support examples as additional queries
-        #  do_subsample_support : (true/False), shuffle and sub-select the support examples
-        #  do_set_perm : (true/False), shuffle the order of examples in each set, both for support and queries
-        # assert mode in ['train','val','human_all_piantadosi_train','human_all_piantadosi_val',
-                    # 'human_bool_piantadosi_test','human_all_piantadosi_test']
-        self.mode = mode
-        self.inc_support_in_query = inc_support_in_query
-        self.do_subsample_support = do_subsample_support
-        self.do_set_perm = do_set_perm
-        self.mydir_items = os.path.join(mydir,self.mode)
-        self.list_items = glob.glob(self.mydir_items+"/*.txt") # all episode files
-        symb_shapes = ['circle','triangle','rectangle']
-        symb_colors = ['blue','yellow','green']
-        symb_sizes = ['size_1','size_2','size_3']
-        symb_special = ['OBJ_SEP']
-        self.input_symbols = symb_shapes+symb_colors+symb_sizes+symb_special
-        self.output_symbols = ['yes','no']
-        comb = combine_input_output_symb(self.input_symbols,self.output_symbols)
-        self.langs = {'input' : Lang(comb), 'output': Lang(self.output_symbols)}
-        self.min_ns = 0 # min number of support items in episode
-        self.max_ns = 25 # max number of support items in episode
-
-    def __len__(self):
-        return len(self.list_items)
-
-    def __getitem__(self, idx):
-        S = readfile(self.list_items[idx])
-
-        # sub-sample the support examples
-        total_ns_file = len(S['xs'])
-        max_ns_spec = min(self.max_ns,total_ns_file)
-        ns = max_ns_spec
-        if self.do_subsample_support: # randomize order and split
-            assert('train' in self.mode), "error: we only want to shuffle/randomize support during training"
-            S['xs'], S['ys'] = utils.shuffle(S['xs'], S['ys'])            
-            ns = random.randint(self.min_ns,max_ns_spec)
-        if self.do_set_perm:
-            S['xs'], S['ys'] = shuffle_order_within_set(S['xs'], S['ys'])
-            S['xq'], S['yq'] = shuffle_order_within_set(S['xq'], S['yq'])
-        S['xs'] = S['xs'][:ns]
-        S['ys'] = S['ys'][:ns]
-        if self.inc_support_in_query:
-            S['xq'] = S['xs'] + S['xq']
-            S['yq'] = S['ys'] + S['yq']
-        myhash = S['h_str']
-        myhash = myhash + '\n' + 'fn="' + self.list_items[idx] + '"'
-        aux = {'h_str': myhash}
-        return bundle_bbt_episode(S['xs'],S['ys'],S['xq'],S['yq'],myhash,aux=aux)
-
-    def count_unique_hyp(self):
-        list_h = [readfile(fn)['h_str'] for fn in self.list_items]
-        unique_h = sorted(set(list_h))
-        print('number of unique hypotheses:', len(unique_h), 'out of', len(list_h))
-        freq_counter = Counter(list_h)
-        most_common = freq_counter.most_common(200)
-        print('\n most frequent hypotheses:')
-        for hyp, freq in most_common:
-            print(f'{hyp}: {freq}')
-
-    def get_base_rate(self):
-        # computer the ratio of yq responses that are 'yes vs. 'no'
-        yq_all = []
-        for idx in range(len(self.list_items)):
-            S = readfile(self.list_items[idx])
-            for yq_for_set in S['yq']: # yq_for_set is a list of labels for each query in this set                
-                yq_all += yq_for_set
-        yq_all = np.array(yq_all)
-        n = float(len(yq_all))
-        n_yes = np.sum(yq_all=='yes')
-        n_no = np.sum(yq_all=='no')
-        print('prob_yes',round(100.*n_yes/n,3)
-              ,'; prob_no',round(100.*n_no/n,3),'; n=',n)
-        assert(n_no+n_yes==n)
-
 def shuffle_order_within_set(x_pair_list,y_pair_list):
     # Input:
     #        x_pair_list : Like xs or xq, such that it is a list of lists. Each sub-list is a Piantadosi set
@@ -668,125 +571,6 @@ def shuffle_order_within_set(x_pair_list,y_pair_list):
             x_as_objs, y_pair_list[i] = utils.shuffle(x_as_objs, y_pair_list[i])
             x_pair_list[i] = (' OBJ_SEP '.join(x_as_objs)).split()
     return x_pair_list, y_pair_list
-
-class DataSetConceptsGold(DataSetConcepts):
-    # Meta-test for the Piantadosi's set concepts.
-    # Here, the labels are swapped to the *gold labels* rather than human behavior
-    def __init__(self, mode, mydir='data/set_concepts'):
-        assert(mode=='human_all_piantadosi_test')
-        super().__init__(mode, mydir=mydir, inc_support_in_query=False, do_subsample_support=False)
-
-    def __getitem__(self, idx):
-        S = readfile(self.list_items[idx])
-
-        # sub-sample the support examples
-        total_ns_file = len(S['xs'])
-        if total_ns_file > self.max_ns:
-            assert False, "error: we should not have more than max_ns support examples in the gold set"
-        max_ns_spec = min(self.max_ns,total_ns_file)
-        ns = max_ns_spec
-        S['xs'] = S['xs'][:ns]
-        S['ys'] = S['ys'][:ns]
-        myhash = S['h_str']
-        myhash = myhash + '\n' + 'fn="' + self.list_items[idx] + '"'
-        aux = {'h_str': myhash}
-        myhash = myhash.split('\n')
-        mygold = myhash[1]
-        assert('gold_labels=[' in mygold)
-        mygold = mygold.lstrip('gold_labels=[').rstrip(']')
-        mygold = mygold.split(', ')
-        mygold = [item.strip("'") for item in mygold]
-        S['yq'] = [mygold for y in S['yq']]
-        return bundle_bbt_episode(S['xs'],S['ys'],S['xq'],S['yq'],myhash,aux=aux)
-
-class DataSetAlienClassif(Dataset):
-    # for training, sample number of support examples uniformly min_ns to max_ns
-    # for validation, use all of the support examples up to max_ns
-    def __init__(self, mode, mydir='data/alien_figures_classif', inc_support_in_query=True, do_subsample_support=False):
-        # Input
-        #  mode: specific directory with episodes ()
-        #  mydir : parent directory where data is stored
-        #  inc_support_in_query : (True/false), provide support examples as additional queries
-        #  do_subsample_support : (true/False), shuffle and sub-select the support examples
-        assert mode in ['train','val']
-        self.mode = mode
-        self.inc_support_in_query = inc_support_in_query
-        self.do_subsample_support = do_subsample_support
-        self.mydir_items = os.path.join(mydir,self.mode)
-        self.list_items = glob.glob(self.mydir_items+"/*.txt") # all episode files
-        symb_shapes = ['A','B','C','D']
-        symb_attachments = [str(i) for i in range(4)]
-        symb_rot = ['+0','+90','+180','+270']
-        self.input_symbols = symb_shapes+symb_attachments+symb_rot
-        self.output_symbols = ['yes','no']
-        comb = combine_input_output_symb(self.input_symbols,self.output_symbols)
-        self.langs = {'input' : Lang(comb), 'output': Lang(self.output_symbols)}
-        self.min_ns = 1 # min number of support items in episode
-        self.max_ns = 6 # max number of support items in episode
-
-    def __len__(self):
-        return len(self.list_items)
-
-    def __getitem__(self, idx):
-        S = readfile(self.list_items[idx])
-
-        # sub-sample the support examples
-        total_ns_file = len(S['xs'])
-        max_ns_spec = min(self.max_ns,total_ns_file)
-        ns = max_ns_spec
-        if self.do_subsample_support: # randomize order and split
-            assert('train' in self.mode), "error: we only want to shuffle/randomize support during training"
-            S['xs'], S['ys'] = utils.shuffle(S['xs'], S['ys'])
-            ns = random.randint(self.min_ns,max_ns_spec)
-        S['xs'] = S['xs'][:ns]
-        S['ys'] = S['ys'][:ns]
-        if self.inc_support_in_query:
-            S['xq'] = S['xs'] + S['xq']
-            S['yq'] = S['ys'] + S['yq']
-        myhash = S['h_str']
-        aux = {'h_str': myhash}
-        return bundle_bbt_episode(S['xs'],S['ys'],S['xq'],S['yq'],myhash,aux=aux)
-
-class DataSetAlienGenerate(Dataset):
-    # for training, sample number of support examples uniformly min_ns to max_ns
-    # for validation, use all of the support examples up to max_ns
-    def __init__(self, mode, mydir='data/alien_figures_generate', do_subsample_support=False):
-        # Input
-        #  mode: specific directory with episodes ()
-        #  mydir : parent directory where data is stored
-        #  do_subsample_support : (true/False), shuffle and sub-select the support examples
-        assert mode in ['train','val']
-        self.mode = mode
-        self.do_subsample_support = do_subsample_support
-        self.mydir_items = os.path.join(mydir,self.mode)
-        self.list_items = glob.glob(self.mydir_items+"/*.txt") # all episode files
-        symb_shapes = ['A','B','C','D']
-        symb_attachments = [str(i) for i in range(4)]
-        symb_rot = ['+0','+90','+180','+270']
-        self.input_symbols = ['generate']
-        self.output_symbols = symb_shapes+symb_attachments+symb_rot
-        comb = combine_input_output_symb(self.input_symbols,self.output_symbols)
-        self.langs = {'input' : Lang(comb), 'output': Lang(self.output_symbols)}
-        self.min_ns = 1 # min number of support items in episode
-        self.max_ns = 6 # max number of support items in episode
-
-    def __len__(self):
-        return len(self.list_items)
-
-    def __getitem__(self, idx):
-        S = readfile(self.list_items[idx])
-        total_ns_file = len(S['xs'])
-        max_ns_spec = min(self.max_ns,total_ns_file)
-        ns = max_ns_spec
-        if self.do_subsample_support: # randomize order and split
-            assert('train' in self.mode), "error: we only want to shuffle/randomize support during training"
-            S['xs'], S['ys'] = utils.shuffle(S['xs'], S['ys'])
-            ns = random.randint(self.min_ns,max_ns_spec)
-        S['xs'] = S['xs'][:ns]
-        S['ys'] = S['ys'][:ns]
-        myhash = S['h_str']
-        aux = {'h_str': myhash}
-        return bundle_bbt_episode(S['xs'],S['ys'],S['xq'],S['yq'],myhash,aux=aux)
 
 class DataAlg(Dataset):
     # Meta-training for compositional rule learning (synthetic data from Bayesian model)
@@ -880,63 +664,6 @@ def add_response_noise(yq_item, p_noise, langs):
             yq_item[i] = new_token
     return yq_item
 
-class DataHumanOpenEnded(Dataset):
-    # Human data for open-ended task in compositional rule learning
-    
-    def __init__(self, mode, mydir, inc_support_in_query=False):
-        # Input
-        #  mode : 'train' 'val' or 'all' data
-        #  inc_support_in_query : (default=False) include all support examples as queries?
-        #        If True, it messes up the log-likelihood calculations.
-        #  mydir : directory where data is stored
-        assert mode in ['train','val','all']
-        self.mode = mode
-        self.train = (mode == 'train') or (mode == 'all')
-        self.val = mode == 'val'
-        self.inc_support_in_query = inc_support_in_query
-        self.mydir_items = os.path.join(mydir,self.mode)
-        self.list_items = glob.glob(self.mydir_items+"/*.txt") # all episode files
-        self.input_symbols = ['dax', 'lug', 'wif', 'zup', 'fep', 'blicket', 'kiki', 'tufa', 'gazzer']
-        self.output_symbols = ['RED', 'YELLOW', 'GREEN', 'BLUE', 'PURPLE', 'PINK']
-        comb = combine_input_output_symb(self.input_symbols,self.output_symbols)
-        self.langs = {'input' : Lang(comb), 'output': Lang(self.output_symbols)}
-        self.max_ns = 6 # max number of support items in episode
-
-    def __len__(self):
-        return len(self.list_items)
-
-    def __getitem__(self, idx):
-        S = readfile(self.list_items[idx])
-        assert(len(S['xs'])==0) # in the text files, all items should be listed as queries
-        if self.val: # for validation, we want to keep the random seed fixed
-            np_state = np.random.get_state()
-            np.random.seed(idx)
-            r_state = random.getstate()
-            random.seed(idx)
-        S['xq'], S['yq'] = utils.shuffle(S['xq'], S['yq']) # uses np.random seed
-        S = assign_random_map(S, self.input_symbols, self.output_symbols)
-        S = self.__random_query_split_uniform(S)
-        if self.val:
-            np.random.set_state(np_state)
-            random.setstate(r_state)
-        if self.inc_support_in_query:
-            S['xq'] = S['xs'] + S['xq']
-            S['yq'] = S['ys'] + S['yq']  
-        return bundle_bbt_episode(S['xs'],S['ys'],S['xq'],S['yq'],'',aux={})
-
-    def __random_query_split_uniform(self, S):
-        # Randomly split the examples between query and support, uniformly over support size
-        x = S['xs'] + S['xq']
-        y = S['ys'] + S['yq']
-        x, y = utils.shuffle(x,y)
-        n = len(x)
-        ns = random.randint(0,n-1)
-        S['xs'] = x[:ns]
-        S['ys'] = y[:ns]
-        S['xq'] = x[ns:]
-        S['yq'] = y[ns:]
-        return S
-    
 def assign_random_map(S, new_input_symbols, new_output_symbols):
     # Each input and output symbol in the episode file are re-assigned based on 
     #   the standard set of input/output symbols
@@ -1076,50 +803,6 @@ class DataHumanFewShot(Dataset):
         S = readfile(self.list_items[idx])
         return S
     
-# class DataHumanFewShotLapseExamples(DataHumanFewShot):
-#     # For evaluating predictions on human compositional rule learning behavior.
-#     #  In this version, support examples can be dropped at random.
-    
-#     def __init__(self, mode, p_drop_example=float('nan'), inc_support_in_query=False, do_remap=True, data_mult=1, fix_seed=-1, mydir='data/sys_gen/data_human/few_shot'):
-#         # Input
-#         #   mode : 'gold' for ground-truth responses for each command
-#         #          'behavior' for actual human responses
-#         #  inc_support_in_query : (default=False) include all support examples as queries? If True, it messes up the log-likelihood calculations.
-#         #  do_remap : [default=True] Randomly remap the input and output symbols to standard pseudowords and colors 
-#         #  data_mult : [default=1] replicate the queries this many times (useful if we want multiple samples from models)
-#         #  feed_seed : [default=-1] if >=0, fix the random seed for the dataset
-#         assert mode in ['behavior']
-#         super().__init__(mode, inc_support_in_query=inc_support_in_query, do_remap=do_remap, data_mult=data_mult, fix_seed=fix_seed, mydir=mydir)
-#         self.p_drop_example = p_drop_example
-#         assert(self.randomize_order)
-#         assert(not self.inc_support_in_query)
-#         assert(self.do_remap)
-#         assert(self.data_mult==1)
-#         assert(fix_seed==-1)
-#         # print('** Constructing Dataset with support drop-out (p_drop_example=',self.p_drop_example,') **')
-
-#     def set_p_drop(self, p):
-#         # Set the probability of dropping an example
-#         self.p_drop_example = p
-#         print('** Setting p_drop_example=',self.p_drop_example,'**')
-
-#     def __getitem__(self, idx):
-#         assert(not np.isnan(self.p_drop_example)), "p_drop_example should be set before calling __getitem__"
-#         S = readfile(self.list_items[idx])
-#         S['xs'], S['ys'] = utils.shuffle(S['xs'], S['ys'])
-#         S['aux'] = {}
-#         new_xs = []
-#         new_ys = []
-#         for x, y in zip(S['xs'], S['ys']):
-#             if flip(self.p_drop_example):
-#                 continue # drop this example
-#             else:
-#                 new_xs.append(x)
-#                 new_ys.append(y)
-#         S['xs'], S['ys'] = new_xs, new_ys
-#         S = assign_random_map(S, self.input_symbols, self.output_symbols)
-#         return bundle_bbt_episode(S['xs'],S['ys'],S['xq'],S['yq'],'',aux={})
-
 if __name__ == "__main__":
     
     # D_train, D_val = get_dataset('set_concepts')

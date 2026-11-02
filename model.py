@@ -1,10 +1,6 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
 import math
-from copy import deepcopy
-import matplotlib.pyplot as plt
 from train_utils import get_best_device
 DEVICE = get_best_device()
 
