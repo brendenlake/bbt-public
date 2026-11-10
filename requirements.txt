@@ -1,8 +1,9 @@
 # Core dependencies for training and evaluation on the included datasets.
+# Minimum versions match the local bbt environment (Python 3.13.9).
 # LOTlib3 is required separately for logical-concept Bayesian analyses and generation.
-torch
-numpy
-scipy
-matplotlib
-scikit-learn
-pandas
+torch>=2.9.0
+numpy>=2.3.3
+scipy>=1.16.2
+matplotlib>=3.10.6
+scikit-learn>=1.7.2
+pandas>=2.3.3

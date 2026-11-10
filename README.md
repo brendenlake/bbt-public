@@ -9,7 +9,7 @@ Please cite the following article:
 
 Run all commands from the repository root. You should download a directory `data/` from this [link](https://www.dropbox.com/scl/fi/yccrw754po2fctc743uls/bbt_data.zip?rlkey=zb2xvi84x5hhzg3rq80vlwjvi&dl=0) and a directory `out_models/` from this [link](https://www.dropbox.com/scl/fi/os1efy3jmfwj0a8lpg807/bbt_out_models.zip?rlkey=cx1cxj7uwvfkhekeecbnkanuh&dl=0) and place them in the repository root. Note that the checkpoints zip is 3 GB. You can evaluate the provided checkpoints without retraining or regenerating datasets.
 
-Install the core dependencies using Python 3:
+Install the core dependencies using Python 3. The minimum versions in `requirements.txt` match the local `bbt` environment, which uses Python 3.13.9; newer dependency versions are also allowed:
 ```bash
 python -m pip install -r requirements.txt
 ```
